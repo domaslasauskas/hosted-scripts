@@ -23,22 +23,6 @@ function _install() {
     port=$(port 10000 14000)
     domain=$(hostname -f)
 
-    # Download App
-    echo "Downloading Readarr"
-    
-    curl -sL "http://readarr.servarr.com/v1/update/develop/updatefile?os=linux&runtime=netcore&arch=x64" -o /tmp/readarr.tar.gz >> "$log" 2>&1 || {
-        echo "Download failed."
-        exit 1
-    }
-
-    # Extract
-    echo "Extracting Readarr"
-    tar xfv "/tmp/readarr.tar.gz" --transform 's/Readarr/Readarr-audiobooks/' --directory $HOME/ >> "$log" 2>&1 || {
-        echo_error "Failed to extract"
-        exit 1
-    }
-    rm -rf /tmp/readarr.tar.gz
-
     if [[ ! -d $HOME/.config/systemd/user/ ]]; then
         mkdir -p $HOME/.config/systemd/user/
     fi
@@ -52,7 +36,7 @@ After=syslog.target network.target
 
 [Service]
 Type=simple
-ExecStart=$HOME/Readarr-audiobooks/Readarr -nobrowser -data=$HOME/.config/readarr-audiobooks/
+ExecStart=$HOME/Readarr/Readarr -nobrowser -data=$HOME/.config/readarr-audiobooks/
 TimeoutStopSec=20
 KillMode=process
 Restart=on-failure
@@ -104,9 +88,8 @@ PROWLARR
 }
 
 function _remove() {
-    systemctl disable --now --user readarr
+    systemctl disable --now --user readarr-audiobooks
     rm -rf "$HOME/.config/readarr-audiobooks/"
-    rm -rf "$HOME/Readarr-audiobooks/"
     echo "Readarr has been removed."
 }
 
