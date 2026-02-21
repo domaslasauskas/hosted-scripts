@@ -4,7 +4,7 @@
 mkdir -p "$HOME/.logs/"
 export log="$HOME/.logs/tailscale.log"
 touch "$log"
-export subnet=$(cat $HOME/.subnet.lock)
+export subnet=$(cat "$HOME/.install/subnet.lock")
 
 function port() {
     LOW_BOUND=$1
@@ -61,6 +61,7 @@ WantedBy=default.target
 
 EOS
 
+    systemctl --user daemon-reload
     systemctl --user enable --now tailscaled
     echo "Tailscaled started"
     echo "Setting up tailscale"
@@ -113,7 +114,16 @@ function _remove(){
     echo "Tailscale removed"
 }
 
-echo 'This is unsupported software. You will not get help with this, please answer `yes` if you understand and wish to proceed'
+echo 'This is unsupported software. You may find the license with the hosted-scripts project. You will not get help with this, please answer `yes` if you understand and wish to proceed.'
+if [[ -n "${subnet}" ]] && [[ -f "$HOME/.config/systemd/user/tailscaled.service" ]]; then
+    if ! grep -q "${subnet}" "$HOME/.config/systemd/user/tailscaled.service"; then
+        echo ""
+        echo "WARN: Previous installs of this script (if downloaded before Sept 2, 2025) have a vulnerability that may have affected you."
+        echo "Please uninstall and reinstall. This may have allowed access to your tailnet to the external internet!"
+        echo ""
+    fi
+fi
+
 if [[ -z ${eula} ]]; then
     read -r eula
 fi
