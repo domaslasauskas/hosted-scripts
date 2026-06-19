@@ -92,8 +92,8 @@ function _seerr_update() {
         fi
     fi
     # Replace old source with new
-    rm -rf $HOME/seerr
     mv $HOME/seerr_new $HOME/seerr
+
     # Bypass Node version requirement if present
     sed -i 's|engine-strict=true|engine-strict=false|g' $HOME/seerr/.npmrc || true
 
@@ -160,6 +160,7 @@ EOF
     cat > $HOME/seerr/env.conf << EOF
 # specify on which port to listen
 PORT=$port
+CONFIG_DIRECTORY="/home/$user/.config/seerr"
 EOF
 
     systemctl --user daemon-reload
