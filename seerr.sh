@@ -66,6 +66,70 @@ function _seerr_install() {
     echo "Succesfully built"
 }
 
+function _seerr_update() {
+    echo "Updating seerr to latest release"
+    systemctl --user stop seerr || true
+    dlurl="$(curl -sS https://api.github.com/repos/seerr-team/seerr/releases/latest | jq .tarball_url -r)"
+    wget "$dlurl" -q -O /home/${user}/seerr.tar.gz >> "$log" 2>&1 || {
+        echo "Download failed"
+        exit 1
+    }
+    mkdir -p $HOME/seerr_new
+    tar --strip-components=1 -C $HOME/seerr_new -xzvf /home/${user}/seerr.tar.gz >> "$log" 2>&1 || {
+        echo "Extraction failed"
+        rm -rf $HOME/seerr_new
+        exit 1
+    }
+    rm /home/${user}/seerr.tar.gz
+
+    # If an existing install exists, move it to seerr.bak (remove old bak first)
+    if [[ -d $HOME/seerr ]]; then
+        rm -rf $HOME/seerr.bak || true
+        mv $HOME/seerr $HOME/seerr.bak
+        # preserve env.conf from previous install into new build if present
+        if [[ -f $HOME/seerr.bak/env.conf ]]; then
+            cp $HOME/seerr.bak/env.conf $HOME/seerr_new/env.conf
+        fi
+    fi
+    # Replace old source with new
+    rm -rf $HOME/seerr
+    mv $HOME/seerr_new $HOME/seerr
+    # Bypass Node version requirement if present
+    sed -i 's|engine-strict=true|engine-strict=false|g' $HOME/seerr/.npmrc || true
+
+    echo "Installing dependencies via pnpm (this might take a while)"
+    pnpm install --prefix $HOME/seerr >> "$log" 2>&1 || {
+        echo "Failed to install dependencies"
+        echo "Install failed; you can revert using the 'revert' option to restore seerr.bak"
+        exit 1
+    }
+
+    echo "Building seerr (this might take a while)"
+    sed -i "s|256000,|256000,\n    cpus: 6,|g" $HOME/seerr/next.config.js || true
+    pnpm --prefix $HOME/seerr build >> "$log" 2>&1 || {
+        echo "Failed to build seerr sqlite"
+        exit 1
+    }
+
+    systemctl --user daemon-reload
+    systemctl --user restart seerr
+    echo "seerr updated and restarted"
+}
+
+function _seerr_revert() {
+    if [[ ! -d $HOME/seerr.bak ]]; then
+        echo "No seerr.bak found to revert to."
+        return 1
+    fi
+    echo "Reverting to seerr.bak..."
+    systemctl --user stop seerr || true
+    rm -rf $HOME/seerr
+    mv $HOME/seerr.bak $HOME/seerr
+    systemctl --user daemon-reload
+    systemctl --user start seerr || true
+    echo "Revert complete — running the version from seerr.bak"
+}
+
 function _port() {
     LOW_BOUND=$1
     UPPER_BOUND=$2
@@ -131,7 +195,9 @@ echo ""
 echo "What do you like to do?"
 echo ""
 echo "install = Install seerr"
+echo "update = Update seerr to latest release"
 echo "uninstall = Completely removes seerr"
+echo "revert = Revert to previous seerr.bak"
 echo "exit = Exits Installer"
 while true; do
     read -r -p "Enter it here: " choice
@@ -141,6 +207,17 @@ while true; do
             _deps
             _seerr_install
             _service
+            break
+            ;;
+        "update")
+            clear
+            _deps
+            _seerr_update
+            break
+            ;;
+        "revert")
+            clear
+            _seerr_revert
             break
             ;;
         "uninstall")
